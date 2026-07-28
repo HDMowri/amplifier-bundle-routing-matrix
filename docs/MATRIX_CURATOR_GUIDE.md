@@ -395,6 +395,36 @@ Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 The only universal free-pass glob is `model: "*"` for providers like Ollama
 where users choose their own models.
 
+### Candidate Lists Only Fall Back Across *Providers*
+
+`resolve_model_preference()` returns on the first candidate whose **provider is
+installed**, and for an exact pin it never checks that the model exists. In a
+single-provider matrix every candidate after the first is therefore unreachable —
+they all succeed or fail together — and a runtime failure (retired ID, quota,
+outage) is not retried against later candidates either.
+
+Write one candidate per role in a single-provider matrix. Real fallback comes
+from listing multiple *providers*, or from the caller's `model_role` list, where
+role-level fallback does work.
+
+### `reasoning_effort` Is Checked Against the *Model*, Not the Matrix
+
+A matrix `config.reasoning_effort` is an **operator default** — it applies only
+when the caller supplies none. The provider then checks it against the pinned
+model's advertised levels: an advertised value is forwarded, an unadvertised one
+is **dropped silently** (INFO log, model default), and only a malformed token
+raises. A wrong-but-well-formed effort therefore makes the matrix claim one thing
+while the model runs at its default. This shipped live — `xhigh` on
+`claude-sonnet-4.6`, which advertises only `low/medium/high/max`.
+
+Advertised sets vary by SDK version, and can include values this repo's
+`tests/matrix_validation_rules.yaml` rejects (`gemini-3.5-flash` advertises
+`minimal`), so read them from the installed provider before pinning:
+
+```bash
+amplifier provider models github-copilot
+```
+
 ### Provider-Specific Naming
 
 Different providers use different naming conventions for the **same underlying model**. Always use the provider's native format.
